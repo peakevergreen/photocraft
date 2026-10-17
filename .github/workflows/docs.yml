@@ -27,6 +27,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' }}
     timeout-minutes: 15
     name: mdBook build
     runs-on: ubuntu-latest

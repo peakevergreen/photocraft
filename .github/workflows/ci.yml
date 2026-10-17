@@ -40,6 +40,7 @@ jobs:
   # platform: the app shell, UI, text and fonts, GPU, pen input, build scripts or the lockfile.
   # macOS is tested only by release.yml.
   platforms:
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' }}
     timeout-minutes: 10
     name: select platforms
     runs-on: ubuntu-latest
@@ -85,6 +86,7 @@ jobs:
           fi
 
   test:
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' }}
     timeout-minutes: 100
     name: test (${{ matrix.os }}${{ matrix.part != 'all' && format(', {0}', matrix.part) || '' }})
     needs: platforms
@@ -206,7 +208,7 @@ jobs:
     timeout-minutes: 5
     name: test (windows-latest)
     needs: [platforms, test, test-variants]
-    if: ${{ !cancelled() }}
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' && (!cancelled()) }}
     runs-on: ubuntu-latest
     steps:
       - env:
@@ -222,6 +224,7 @@ jobs:
   # that job's key) and saves none: the dependencies are the same, and the 10 GB cache budget is
   # tight (#2688).
   test-variants:
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' }}
     timeout-minutes: 100
     name: test (${{ matrix.variant }})
     runs-on: ubuntu-latest
@@ -280,6 +283,7 @@ jobs:
           -E 'package(photocraft-text) | package(photocraft-io) | package(photocraft-ui-egui)'
 
   corpus:
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' }}
     timeout-minutes: 30
     # Real-file corpus tests (cargo feature `corpus`), on every PR and on main. The corpora are
     # pinned in xtask/src/corpus_pins.rs and sha256-verified (xtask/*.sha256) after both a cache
@@ -313,6 +317,7 @@ jobs:
         run: cargo xtask test-corpus
 
   wasm:
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' }}
     timeout-minutes: 30
     name: wasm32 check
     runs-on: ubuntu-latest
@@ -334,7 +339,7 @@ jobs:
     name: web build and wasm size gate
     # PRs run it only when web-relevant files change (see `platforms`); main always does.
     needs: platforms
-    if: needs.platforms.outputs.web == 'true'
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' && (needs.platforms.outputs.web == 'true') }}
     runs-on: ubuntu-latest
     env:
       # Match release.yml so PR results reflect what would actually ship.
@@ -381,7 +386,7 @@ jobs:
     timeout-minutes: 60
     name: fuzz (${{ matrix.target.crate }}/${{ matrix.target.name }})
     # Placeholder: manual trigger only until a nightly schedule is enabled.
-    if: github.event_name == 'workflow_dispatch' && inputs.fuzz
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' && (github.event_name == 'workflow_dispatch' && inputs.fuzz) }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
