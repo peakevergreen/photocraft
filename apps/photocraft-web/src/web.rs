@@ -63,12 +63,17 @@ pub fn start() {
         }
         // Hydrate before constructing an interactive session: a late load must never undo a
         // user deletion/reorder. Storage denial or timeout still opens a usable session.
-        let (database, presets, mut preset_warnings) = match crate::indexed_presets::load().await {
-            Ok((db, bridge, warnings)) => (Some(db), bridge, warnings),
-            Err(e) => {
-                let bridge = crate::preset_bridge::Bridge::default();
-                bridge.unavailable(e);
-                (None, bridge, Vec::new())
+        let (database, presets, mut preset_warnings) = if q.contains("lensflow=1") {
+            // Portal projects are tenant scoped; do not inherit another user's browser presets.
+            (None, crate::preset_bridge::Bridge::default(), Vec::new())
+        } else {
+            match crate::indexed_presets::load().await {
+                Ok((db, bridge, warnings)) => (Some(db), bridge, warnings),
+                Err(e) => {
+                    let bridge = crate::preset_bridge::Bridge::default();
+                    bridge.unavailable(e);
+                    (None, bridge, Vec::new())
+                }
             }
         };
         let pen_target = canvas.clone();
@@ -300,6 +305,7 @@ impl eframe::App for WebShell {
             });
         }
         self.serve_fonts(ctx);
+        crate::lensflow::drain(&mut self.app, ctx);
         self.app.logic(ctx, frame);
         self.save_presets(ctx);
     }
@@ -334,6 +340,7 @@ impl eframe::App for WebShell {
 }
 
 fn services(inbox: Inbox) -> Services {
+    let portal = query().contains("lensflow=1");
     Services {
         screen_pick: screen_color_service(),
         import: Some(Box::new(|name: &str, bytes: &[u8], max_svg_group_depth: usize| {
@@ -385,8 +392,10 @@ fn services(inbox: Inbox) -> Services {
         })),
         inbox: Some(inbox),
         // Preferences live in the browser's localStorage.
-        load_prefs: Some(Box::new(|| local_storage()?.get_item(PREFS_KEY).ok().flatten())),
-        save_prefs: Some(Box::new(|text: &str| local_storage().ok_or("no localStorage")?.set_item(PREFS_KEY, text).map_err(|e| format!("{e:?}")))),
+        load_prefs: Some(Box::new(move || if portal { None } else { local_storage()?.get_item(PREFS_KEY).ok().flatten() })),
+        save_prefs: Some(Box::new(move |text: &str| {
+            if portal { Ok(()) } else { local_storage().ok_or("no localStorage")?.set_item(PREFS_KEY, text).map_err(|e| format!("{e:?}")) }
+        })),
         ..Default::default()
     }
 }

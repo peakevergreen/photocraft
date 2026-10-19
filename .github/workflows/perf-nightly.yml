@@ -35,6 +35,7 @@ env:
 
 jobs:
   perf:
+    if: ${{ vars.ENABLE_NATIVE_EDITOR_WORKFLOWS == 'true' }}
     name: perf (macOS, Apple GPU)
     # Pinned image, not -latest: the machine class must stay fixed for comparisons.
     runs-on: macos-15

@@ -1,0 +1,50 @@
+name: LensFlow web integration
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lensflow-web-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: '2'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+
+jobs:
+  web:
+    name: WebAssembly checks and release build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: lensflow-web
+      - run: cargo fmt --all --check
+      - name: Browser target lint
+        run: cargo clippy --locked --target wasm32-unknown-unknown -p photocraft-web --no-deps -- -D warnings
+      - name: Browser-safe crate checks
+        run: cargo xtask wasm
+      - name: Dependency layers
+        run: cargo xtask layers
+      - name: Optimized browser build
+        run: cargo build --locked --target wasm32-unknown-unknown -p photocraft-web --profile wasm-release
+      - name: Verify browser artifact and download chunks
+        run: python3 scripts/lensflow_web_artifact.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: photocraft-web-wasm
+          path: target/lensflow-web-artifact
+          retention-days: 7
